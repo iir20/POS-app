@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="nav-bar">
+        <h1>🏪 POS System</h1>
+        <div class="nav-links">
+            <a href="/">POS</a>
+            <a href="/inventory">Inventory</a>
+            <a href="/due-list">Due List</a>
+            <a href="/expenses">Expenses</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section-title">📦 Inventory Management</div>
+        
+        <div style="margin-bottom: 20px;">
+            <button class="btn-submit" onclick="showAddProductModal()">➕ Add New Product</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Purchase Price (৳)</th>
+                        <th>Sale Price (৳)</th>
+                        <th>Stock Quantity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="addProductModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddProductModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #667eea;">Add New Product</h2>
+            <div class="form-group">
+                <label>Product Name:</label>
+                <input type="text" id="addProductName" placeholder="Enter product name">
+            </div>
+            <div class="form-group">
+                <label>Purchase Price (৳):</label>
+                <input type="number" id="addPurchasePrice" placeholder="Enter purchase price" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+                <label>Sale Price (৳):</label>
+                <input type="number" id="addSalePrice" placeholder="Enter sale price" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+                <label>Stock Quantity:</label>
+                <input type="number" id="addStockQuantity" placeholder="Enter stock quantity" min="0">
+            </div>
+            <button class="btn-submit" onclick="addProduct()">Add Product</button>
+        </div>
+    </div>
+
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditProductModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #667eea;">Edit Product</h2>
+            <input type="hidden" id="editProductId">
+            <div class="form-group">
+                <label>Product Name:</label>
+                <input type="text" id="editProductName" placeholder="Enter product name">
+            </div>
+            <div class="form-group">
+                <label>Purchase Price (৳):</label>
+                <input type="number" id="editPurchasePrice" placeholder="Enter purchase price" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+                <label>Sale Price (৳):</label>
+                <input type="number" id="editSalePrice" placeholder="Enter sale price" step="0.01" min="0">
+            </div>
+            <div class="form-group">
+                <label>Stock Quantity:</label>
+                <input type="number" id="editStockQuantity" placeholder="Enter stock quantity" min="0">
+            </div>
+            <button class="btn-submit" onclick="updateProduct()">Update Product</button>
+        </div>
+    </div>
+
+    <script>
+        async function loadInventory() {
+            const response = await fetch('/api/products');
+            const products = await response.json();
+            
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = '';
+            
+            if (products.length === 0) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.setAttribute('colspan', '6');
+                td.style.textAlign = 'center';
+                td.textContent = 'No products found';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+                return;
+            }
+            
+            products.forEach(product => {
+                const tr = document.createElement('tr');
+                
+                let statusText = '';
+                let stockColor = '#28a745';
+                
+                if (product.stock_quantity === 0) {
+                    statusText = 'OUT OF STOCK';
+                    stockColor = '#dc3545';
+                } else if (product.stock_quantity < 5) {
+                    statusText = '⚠️ LOW STOCK';
+                    stockColor = '#ffc107';
+                } else {
+                    statusText = '✅ IN STOCK';
+                }
+                
+                const nameTd = document.createElement('td');
+                nameTd.style.fontWeight = 'bold';
+                nameTd.textContent = product.name;
+                
+                const purchaseTd = document.createElement('td');
+                purchaseTd.textContent = '৳' + product.purchase_price.toFixed(2);
+                
+                const saleTd = document.createElement('td');
+                saleTd.textContent = '৳' + product.sale_price.toFixed(2);
+                
+                const stockTd = document.createElement('td');
+                stockTd.style.fontWeight = 'bold';
+                stockTd.style.color = stockColor;
+                stockTd.textContent = product.stock_quantity;
+                
+                const statusTd = document.createElement('td');
+                const statusSpan = document.createElement('span');
+                statusSpan.style.color = stockColor;
+                statusSpan.style.fontWeight = 'bold';
+                statusSpan.textContent = statusText;
+                statusTd.appendChild(statusSpan);
+                
+                const actionTd = document.createElement('td');
+                const editBtn = document.createElement('button');
+                editBtn.textContent = '✏️ Edit';
+                editBtn.style.background = '#667eea';
+                editBtn.style.color = 'white';
+                editBtn.style.border = 'none';
+                editBtn.style.padding = '8px 15px';
+                editBtn.style.borderRadius = '5px';
+                editBtn.style.cursor = 'pointer';
+                editBtn.dataset.productId = product.id;
+                editBtn.dataset.productName = product.name;
+                editBtn.dataset.purchasePrice = product.purchase_price;
+                editBtn.dataset.salePrice = product.sale_price;
+                editBtn.dataset.stockQuantity = product.stock_quantity;
+                editBtn.onclick = function() {
+                    showEditProductModal(
+                        this.dataset.productId,
+                        this.dataset.productName,
+                        this.dataset.purchasePrice,
+                        this.dataset.salePrice,
+                        this.dataset.stockQuantity
+                    );
+                };
+                actionTd.appendChild(editBtn);
+                
+                tr.appendChild(nameTd);
+                tr.appendChild(purchaseTd);
+                tr.appendChild(saleTd);
+                tr.appendChild(stockTd);
+                tr.appendChild(statusTd);
+                tr.appendChild(actionTd);
+                
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showAddProductModal() {
+            document.getElementById('addProductModal').style.display = 'block';
+        }
+
+        function closeAddProductModal() {
+            document.getElementById('addProductModal').style.display = 'none';
+            document.getElementById('addProductName').value = '';
+            document.getElementById('addPurchasePrice').value = '';
+            document.getElementById('addSalePrice').value = '';
+            document.getElementById('addStockQuantity').value = '';
+        }
+
+        function showEditProductModal(id, name, purchasePrice, salePrice, stockQuantity) {
+            document.getElementById('editProductId').value = id;
+            document.getElementById('editProductName').value = name;
+            document.getElementById('editPurchasePrice').value = purchasePrice;
+            document.getElementById('editSalePrice').value = salePrice;
+            document.getElementById('editStockQuantity').value = stockQuantity;
+            document.getElementById('editProductModal').style.display = 'block';
+        }
+
+        function closeEditProductModal() {
+            document.getElementById('editProductModal').style.display = 'none';
+        }
+
+        async function addProduct() {
+            const name = document.getElementById('addProductName').value.trim();
+            const purchasePrice = parseFloat(document.getElementById('addPurchasePrice').value);
+            const salePrice = parseFloat(document.getElementById('addSalePrice').value);
+            const stockQuantity = parseInt(document.getElementById('addStockQuantity').value);
+            
+            if (!name) {
+                alert('Please enter product name!');
+                return;
+            }
+            
+            if (isNaN(purchasePrice) || purchasePrice < 0) {
+                alert('Please enter a valid purchase price!');
+                return;
+            }
+            
+            if (isNaN(salePrice) || salePrice < 0) {
+                alert('Please enter a valid sale price!');
+                return;
+            }
+            
+            if (isNaN(stockQuantity) || stockQuantity < 0) {
+                alert('Please enter a valid stock quantity!');
+                return;
+            }
+            
+            const response = await fetch('/api/add_product', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    purchase_price: purchasePrice,
+                    sale_price: salePrice,
+                    stock_quantity: stockQuantity
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Product added successfully!');
+                closeAddProductModal();
+                loadInventory();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        async function updateProduct() {
+            const id = document.getElementById('editProductId').value;
+            const name = document.getElementById('editProductName').value.trim();
+            const purchasePrice = parseFloat(document.getElementById('editPurchasePrice').value);
+            const salePrice = parseFloat(document.getElementById('editSalePrice').value);
+            const stockQuantity = parseInt(document.getElementById('editStockQuantity').value);
+            
+            if (!name) {
+                alert('Please enter product name!');
+                return;
+            }
+            
+            if (isNaN(purchasePrice) || purchasePrice < 0) {
+                alert('Please enter a valid purchase price!');
+                return;
+            }
+            
+            if (isNaN(salePrice) || salePrice < 0) {
+                alert('Please enter a valid sale price!');
+                return;
+            }
+            
+            if (isNaN(stockQuantity) || stockQuantity < 0) {
+                alert('Please enter a valid stock quantity!');
+                return;
+            }
+            
+            const response = await fetch(`/api/update_product/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    purchase_price: purchasePrice,
+                    sale_price: salePrice,
+                    stock_quantity: stockQuantity
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Product updated successfully!');
+                closeEditProductModal();
+                loadInventory();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        window.onclick = function(event) {
+            const addModal = document.getElementById('addProductModal');
+            const editModal = document.getElementById('editProductModal');
+            if (event.target == addModal) {
+                closeAddProductModal();
+            }
+            if (event.target == editModal) {
+                closeEditProductModal();
+            }
+        }
+
+        loadInventory();
+        setInterval(loadInventory, 10000);
+    </script>
+</body>
+</html>

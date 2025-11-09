@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="nav-bar">
+        <h1>🏪 POS System</h1>
+        <div class="nav-links">
+            <a href="/">POS</a>
+            <a href="/inventory">Inventory</a>
+            <a href="/due-list">Due List</a>
+            <a href="/expenses">Expenses</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="pos-container">
+            <div class="products-section">
+                <div class="section-title">প্রোডাক্ট লিস্ট (Product List)</div>
+                <div class="products-grid" id="productsGrid"></div>
+            </div>
+
+            <div class="cart-section">
+                <div class="section-title">বেচা-বিক্রির খাতা (Transaction List)</div>
+                <div class="cart-items" id="cartItems">
+                    <p style="text-align: center; color: #999; padding: 20px;">Cart is empty</p>
+                </div>
+                <div class="cart-total">
+                    Total: ৳<span id="cartTotal">0</span>
+                </div>
+                <div class="checkout-section">
+                    <button class="checkout-btn btn-cash" onclick="checkout('cash')">💵 Cash Sale</button>
+                    <button class="checkout-btn btn-due" onclick="showDueModal()">📝 Add to Due (বাকি)</button>
+                    <button class="checkout-btn clear-cart" onclick="clearCart()">🗑️ Clear Cart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dueModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDueModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #667eea;">Select Customer</h2>
+            <div class="form-group">
+                <label>Customer:</label>
+                <select id="customerSelect">
+                    <option value="">-- Select Customer --</option>
+                </select>
+            </div>
+            <button class="btn-submit" onclick="checkout('due')">Add to Due</button>
+        </div>
+    </div>
+
+    <script>
+        let products = [];
+        let cart = [];
+        let customers = [];
+
+        async function loadProducts() {
+            const response = await fetch('/api/products');
+            products = await response.json();
+            displayProducts();
+        }
+
+        async function loadCustomers() {
+            const response = await fetch('/api/customers');
+            customers = await response.json();
+            const select = document.getElementById('customerSelect');
+            select.innerHTML = '<option value="">-- Select Customer --</option>';
+            customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer.id;
+                option.textContent = `${customer.name} (${customer.phone})`;
+                select.appendChild(option);
+            });
+        }
+
+        function displayProducts() {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = '';
+            products.forEach(product => {
+                const btn = document.createElement('button');
+                btn.className = 'product-btn';
+                btn.innerHTML = `
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-price">৳${product.sale_price}</div>
+                `;
+                btn.onclick = () => addToCart(product);
+                grid.appendChild(btn);
+            });
+        }
+
+        function addToCart(product) {
+            const existingItem = cart.find(item => item.id === product.id);
+            if (existingItem) {
+                if (existingItem.quantity < product.stock_quantity) {
+                    existingItem.quantity++;
+                } else {
+                    alert(`Only ${product.stock_quantity} units available!`);
+                    return;
+                }
+            } else {
+                if (product.stock_quantity > 0) {
+                    cart.push({
+                        id: product.id,
+                        name: product.name,
+                        price: product.sale_price,
+                        quantity: 1,
+                        stock: product.stock_quantity
+                    });
+                } else {
+                    alert('Product out of stock!');
+                    return;
+                }
+            }
+            updateCart();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCart();
+        }
+
+        function updateCart() {
+            const cartItemsDiv = document.getElementById('cartItems');
+            if (cart.length === 0) {
+                cartItemsDiv.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Cart is empty</p>';
+            } else {
+                cartItemsDiv.innerHTML = '';
+                cart.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'cart-item';
+                    div.innerHTML = `
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.name}</div>
+                            <div class="cart-item-details">৳${item.price} × ${item.quantity} = ৳${item.price * item.quantity}</div>
+                        </div>
+                        <button class="cart-item-remove" onclick="removeFromCart(${index})">✕</button>
+                    `;
+                    cartItemsDiv.appendChild(div);
+                });
+            }
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            document.getElementById('cartTotal').textContent = total;
+        }
+
+        function clearCart() {
+            cart = [];
+            updateCart();
+        }
+
+        function showDueModal() {
+            if (cart.length === 0) {
+                alert('Cart is empty!');
+                return;
+            }
+            loadCustomers();
+            document.getElementById('dueModal').style.display = 'block';
+        }
+
+        function closeDueModal() {
+            document.getElementById('dueModal').style.display = 'none';
+        }
+
+        async function checkout(status) {
+            if (cart.length === 0) {
+                alert('Cart is empty!');
+                return;
+            }
+
+            let customerId = null;
+            if (status === 'due') {
+                customerId = document.getElementById('customerSelect').value;
+                if (!customerId) {
+                    alert('Please select a customer!');
+                    return;
+                }
+                customerId = parseInt(customerId);
+            }
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+            const saleData = {
+                items: cart,
+                total_amount: total,
+                status: status,
+                customer_id: customerId
+            };
+
+            const response = await fetch('/api/add_sale', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(saleData)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                alert(status === 'cash' ? 'Sale completed!' : 'Added to due!');
+                cart = [];
+                updateCart();
+                loadProducts();
+                closeDueModal();
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('dueModal');
+            if (event.target == modal) {
+                closeDueModal();
+            }
+        }
+
+        loadProducts();
+    </script>
+</body>
+</html>

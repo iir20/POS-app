@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Overview - ব্যবসার ওভারভিউ</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="nav-bar">
+        <h1>🏪 POS System</h1>
+        <div class="nav-links">
+            <a href="/">POS</a>
+            <a href="/inventory">Inventory</a>
+            <a href="/due-list">Due List</a>
+            <a href="/expenses">Expenses</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section-title">ব্যবসার ওভারভিউ (Business Overview)</div>
+        
+        <div class="dashboard-grid">
+            <div class="dashboard-card card-sales">
+                <div class="card-title">📈 Total Sales Today</div>
+                <div class="card-value">৳<span id="totalSales">0</span></div>
+            </div>
+            
+            <div class="dashboard-card card-expenses">
+                <div class="card-title">💸 Total Expenses Today</div>
+                <div class="card-value">৳<span id="totalExpenses">0</span></div>
+            </div>
+            
+            <div class="dashboard-card card-profit">
+                <div class="card-title">💰 Net Profit Today</div>
+                <div class="card-value">৳<span id="netProfit">0</span></div>
+            </div>
+            
+            <div class="dashboard-card card-due">
+                <div class="card-title">📝 Total Due Amount</div>
+                <div class="card-value">৳<span id="totalDue">0</span></div>
+            </div>
+        </div>
+
+        <div class="section-title">⚠️ Low Stock Alerts (এলার্ট মেসেজ)</div>
+        <div id="lowStockSection"></div>
+    </div>
+
+    <script>
+        async function loadDashboardData() {
+            const response = await fetch('/api/dashboard_data');
+            const data = await response.json();
+            
+            document.getElementById('totalSales').textContent = data.total_sales_today.toFixed(2);
+            document.getElementById('totalExpenses').textContent = data.total_expenses_today.toFixed(2);
+            
+            const netProfit = data.total_sales_today - data.total_expenses_today;
+            document.getElementById('netProfit').textContent = netProfit.toFixed(2);
+            
+            document.getElementById('totalDue').textContent = data.total_due.toFixed(2);
+            
+            const lowStockSection = document.getElementById('lowStockSection');
+            if (data.low_stock_products.length === 0) {
+                lowStockSection.innerHTML = '<div class="alert alert-success">✅ All products have sufficient stock!</div>';
+            } else {
+                let html = '<div class="alert alert-warning">';
+                html += '<strong>⚠️ Warning: The following products are running low on stock:</strong><br><br>';
+                data.low_stock_products.forEach(product => {
+                    html += `• <strong>${product.name}</strong>: Only ${product.stock_quantity} units left!<br>`;
+                });
+                html += '</div>';
+                lowStockSection.innerHTML = html;
+            }
+        }
+
+        loadDashboardData();
+        setInterval(loadDashboardData, 30000);
+    </script>
+</body>
+</html>

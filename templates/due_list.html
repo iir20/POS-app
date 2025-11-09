@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Due List - বাকির খাতা</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="nav-bar">
+        <h1>🏪 POS System</h1>
+        <div class="nav-links">
+            <a href="/">POS</a>
+            <a href="/inventory">Inventory</a>
+            <a href="/due-list">Due List</a>
+            <a href="/expenses">Expenses</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section-title">বাকির খাতা (Due List)</div>
+        
+        <div style="margin-bottom: 20px;">
+            <button class="btn-submit" onclick="showAddCustomerModal()">➕ Add New Customer</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Customer Name</th>
+                        <th>Phone Number</th>
+                        <th>Total Due (৳)</th>
+                    </tr>
+                </thead>
+                <tbody id="customersTableBody">
+                    <tr>
+                        <td colspan="3" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="addCustomerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddCustomerModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: #667eea;">Add New Customer</h2>
+            <div class="form-group">
+                <label>Name:</label>
+                <input type="text" id="customerName" placeholder="Enter customer name">
+            </div>
+            <div class="form-group">
+                <label>Phone:</label>
+                <input type="text" id="customerPhone" placeholder="Enter phone number">
+            </div>
+            <button class="btn-submit" onclick="addCustomer()">Add Customer</button>
+        </div>
+    </div>
+
+    <script>
+        async function loadCustomers() {
+            const response = await fetch('/api/customers');
+            const customers = await response.json();
+            
+            const tbody = document.getElementById('customersTableBody');
+            tbody.innerHTML = '';
+            
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">No customers found</td></tr>';
+                return;
+            }
+            
+            customers.forEach(customer => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${customer.name}</td>
+                    <td>${customer.phone || 'N/A'}</td>
+                    <td style="font-weight: bold; color: ${customer.total_due > 0 ? '#dc3545' : '#28a745'}">
+                        ৳${customer.total_due.toFixed(2)}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'block';
+        }
+
+        function closeAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'none';
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerPhone').value = '';
+        }
+
+        async function addCustomer() {
+            const name = document.getElementById('customerName').value.trim();
+            const phone = document.getElementById('customerPhone').value.trim();
+            
+            if (!name) {
+                alert('Please enter customer name!');
+                return;
+            }
+            
+            const response = await fetch('/api/add_customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Customer added successfully!');
+                closeAddCustomerModal();
+                loadCustomers();
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('addCustomerModal');
+            if (event.target == modal) {
+                closeAddCustomerModal();
+            }
+        }
+
+        loadCustomers();
+    </script>
+</body>
+</html>
